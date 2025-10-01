@@ -7,7 +7,7 @@ using namespace websockets;
 
 
 const char* WIFI_SSID = "Namanh";
-const char* WIFI_PASS = "namanh0208";
+const char* WIFI_PASS = ""; //neu ban la nguoi tot, xin dung coi lai commit cu de thay pass wifi nha toi. cam on ban
 const char* WS_URL = "wss://doantonghopiot.namanhishere.com/ws";
 const char* ROOM_ID = "101"; 
 
@@ -37,7 +37,7 @@ void setup() {
   digitalWrite(RELAY_PIN, LOW);
 
   
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);//wai phai
   Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -49,7 +49,7 @@ void setup() {
 
   
   SPI.begin();
-  mfrc522.PCD_Init();
+  mfrc522.PCD_Init();//rờ ép ai đi
   Serial.println("RC522 ready.");
 
   
@@ -94,10 +94,12 @@ void loop() {
   delay(1000); 
 }
 
+
 void connectWebSocket() {
-  Serial.println("Connecting to WebSocket...");
+  Serial.println("Connecting to WebSocket...");// web shock két
   if (client.connect(WS_URL)) {
     Serial.println("WebSocket connected!");
+    
     
     String identifyMsg = "{\"type\":\"identification\",\"room\":\"" + String(ROOM_ID) + "\"}";
     client.send(identifyMsg);
@@ -117,12 +119,12 @@ void onMessageCallback(WebsocketsMessage msg) {
   if (data.indexOf("\"AUTHORIZED\"") != -1) {
     Serial.println("Access granted");
     digitalWrite(RELAY_PIN, HIGH);
-
     relayOffTime = millis() + AUTO_CLOSE_DELAY; 
   }
   else if (data.indexOf("\"DENIED\"") != -1) {
     Serial.println("Access denied");
   }
+  
   else if (data == "OPEN_DOOR") {
     Serial.println("Remote OPEN_DOOR command received");
     digitalWrite(RELAY_PIN, HIGH);
@@ -139,9 +141,5 @@ void onEventCallback(WebsocketsEvent event, String data) {
   if (event == WebsocketsEvent::ConnectionClosed) {
     Serial.println("WebSocket closed, reconnecting...");
     connectWebSocket();
-  } else if (event == WebsocketsEvent::GotPing) {
-    Serial.println("Got ping!");
-  } else if (event == WebsocketsEvent::GotPong) {
-    Serial.println("Got pong!");
-  }
+  } 
 }
