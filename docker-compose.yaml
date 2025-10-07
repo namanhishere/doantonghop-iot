@@ -3,7 +3,7 @@ version: "3.8"
 services:
   db:
     image: mysql:8.0
-    container_name: my_mysql
+    container_name: my_mysql_doan_tonghop
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
@@ -19,7 +19,7 @@ services:
 
   phpmyadmin:
     image: phpmyadmin:5.2
-    container_name: my_phpmyadmin
+    container_name: my_phpmyadmin_doan_tonghop
     restart: unless-stopped
     depends_on:
       - db
