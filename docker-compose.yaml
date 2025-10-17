@@ -30,9 +30,6 @@ services:
       UPLOAD_LIMIT: 64M
     ports:
       - "1308:80" # random port mapping for phpMyAdmin
-    volumes:
-      - ./docker/phpmyadmin-sessions:/sessions
-
 
 volumes:
   db_data:
