@@ -1,17 +1,19 @@
 import express from "express";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 import path from "path";
+import mysql from "mysql2/promise";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = process.cwd();
+
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
-import mysql from "mysql2/promise";
+
 
 const db = await mysql.createConnection({
   host: "localhost",
@@ -22,12 +24,10 @@ const db = await mysql.createConnection({
 });
 
 try {
-  await db.connect();
-  console.log("MySQL connected successfully!");
-
-
+    // await db.connect();
+    console.log("MySQL connected successfully!");
 } catch (err) {
-  console.error("MySQL connection failed:", err);
+    console.error("MySQL connection failed:", err);
 }
 
 app.set("view engine", "ejs");
@@ -37,15 +37,19 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // const allowedUIDs = new Set(["C1A3B506-101", "C1AB3506-101"]);
 
-const espClients = new Map();
+interface ESPClient extends WebSocket {
+  roomId?: string;
+}
+const espClients: Map<string, ESPClient> = new Map();
 
-wss.on("connection", (ws) => {
+
+wss.on("connection", (ws: ESPClient) => {
     console.log("New client connected");
 
-    ws.on("message",  async (msg) => {
-        let data;
+    ws.on("message",  async (msg: Buffer) => {
+        let data: any;// any in ts :v
         try {
-            data = JSON.parse(msg);
+            data = JSON.parse(msg.toString());
             console.log("Received:", data);
         } catch (e) {
             console.log("Received non-JSON message:", msg.toString());
@@ -54,8 +58,6 @@ wss.on("connection", (ws) => {
 
         
         switch (data.type) {
-
-            // // No longer this that
             case "identification":
                 if (data.room) {
                     ws.roomId = data.room; 
@@ -67,8 +69,7 @@ wss.on("connection", (ws) => {
                 case "rfid":
                     if (data.uid && data.room) {
                         try {
-                            // Kiểm tra xem thẻ có quyền mở phòng hay không
-                            const [rows] = await db.execute(
+                            const [rows] : any[] = await db.execute(
                                 `SELECT a.card_uid, a.room_id
                                  FROM rfid_access a
                                  JOIN rfid_card c ON a.card_uid = c.uid
@@ -83,16 +84,12 @@ wss.on("connection", (ws) => {
                 
                             if (rows.length > 0) {
                                 status = "AUTHORIZED";
-                
-                                // Ghi log mở cửa thành công
                                 await db.execute(
                                     `INSERT INTO opencloselog (room_id, action, card_uid)
                                      VALUES (?, 'OPEN', ?)`,
                                     [rows[0].room_id, rows[0].card_uid]
                                 );
                             }
-                
-                            // Gửi phản hồi lại ESP / Client
                             ws.send(JSON.stringify({ type: "auth", status }));
                             console.log(`[RFID] ${data.uid} → ${status}`);
                 
@@ -128,13 +125,19 @@ app.get("/", (req, res) => {
 });
 
 
-app.get("/open-door", async (req, res) => {
+app.get("/open-door", async (req: express.Request, res: express.Response) => {
     // https://doantonghopiot.namanhishere.com/open-door?room=101&source=CONSOLE
-    const { room, source } = req.query;
+    let { room, source } = req.query;
 
     if (!room) {
         return res.status(400).send("Missing 'room' query parameter");
     }
+    if (!source) {
+        return res.status(400).send("Missing 'source' query parameter");
+    }
+
+    room  = String(room || "").trim();
+    source  = String(source || "").trim();
 
     const trigger = source && source.toUpperCase() === "EXTERNAL" ? "EXTERNAL" : "CONSOLE";
 
@@ -163,13 +166,20 @@ app.get("/open-door", async (req, res) => {
     }
 });
 
-app.get("/close-door", async (req, res) => {
+app.get("/close-door", async (req: express.Request, res: express.Response) => {
     // https://doantonghopiot.namanhishere.com/close-door?room=101&source=EXTERNAL
-    const { room, source } = req.query;
+    let { room, source } = req.query;
+
 
     if (!room) {
         return res.status(400).send("Missing 'room' query parameter");
     }
+    if (!source) {
+        return res.status(400).send("Missing 'source' query parameter");
+    }
+
+    room  = String(room || "").trim();
+    source  = String(source || "").trim();
 
     const trigger = source && source.toUpperCase() === "EXTERNAL" ? "EXTERNAL" : "CONSOLE";
 
