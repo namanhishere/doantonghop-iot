@@ -37,13 +37,13 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // const allowedUIDs = new Set(["C1A3B506-101", "C1AB3506-101"]);
 
-interface ESPClient extends WebSocket {
+interface IOTClient extends WebSocket {
   roomId?: string;
 }
-const espClients: Map<string, ESPClient> = new Map();
+const IOTClients: Map<string, IOTClient> = new Map();
 
 
-wss.on("connection", (ws: ESPClient) => {
+wss.on("connection", (ws: IOTClient) => {
     console.log("New client connected");
 
     ws.on("message",  async (msg: Buffer) => {
@@ -61,7 +61,7 @@ wss.on("connection", (ws: ESPClient) => {
             case "identification":
                 if (data.room) {
                     ws.roomId = data.room; 
-                    espClients.set(data.room, ws); 
+                    IOTClients.set(data.room, ws); 
                     console.log(`Client for room ${data.room} registered.`);
                 }
                 break;
@@ -111,7 +111,7 @@ wss.on("connection", (ws: ESPClient) => {
     ws.on("close", () => {
         
         if (ws.roomId) {
-            espClients.delete(ws.roomId); 
+            IOTClients.delete(ws.roomId); 
             console.log(`Client for room ${ws.roomId} disconnected and unregistered.`);
         } else {
             console.log("Client disconnected (was never identified).");
@@ -143,7 +143,7 @@ app.get("/open-door", async (req: express.Request, res: express.Response) => {
 
     try {
         // Tìm client ESP tương ứng
-        const ws = espClients.get(room);
+        const ws = IOTClients.get(room);
 
         if (ws) {
             ws.send("OPEN_DOOR");
@@ -165,7 +165,6 @@ app.get("/open-door", async (req: express.Request, res: express.Response) => {
         res.status(500).send("Internal Server Error");
     }
 });
-
 app.get("/close-door", async (req: express.Request, res: express.Response) => {
     // https://doantonghopiot.namanhishere.com/close-door?room=101&source=EXTERNAL
     let { room, source } = req.query;
@@ -184,7 +183,7 @@ app.get("/close-door", async (req: express.Request, res: express.Response) => {
     const trigger = source && source.toUpperCase() === "EXTERNAL" ? "EXTERNAL" : "CONSOLE";
 
     try {
-        const ws = espClients.get(room);
+        const ws = IOTClients.get(room);
 
         if (ws) {
             ws.send("CLOSE_DOOR");

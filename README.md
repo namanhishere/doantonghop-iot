@@ -5,6 +5,23 @@ This project is a IOT's services of Classroom Booking System project by group 1 
 
 As planned, it have 3 part: An ESP32-CAM for QR scanning, An ESP-8266 for RFID reading and a web server to link and control it
 
+## Project structure
+```
+|   .gitignore (use ignore folder)
+|   boardMoCua.ino (ESP8266 rfid door lock board)
+|   docker-compose.yaml (docker compose of database)
+|   nodemon.json
+|   package-lock.json ()
+|   package.json (package file)
+|   README.md (this readme file)
+|   table.sql (inital database config)
+|   tsconfig.json (typescript setting)
+\---src
+        index.ts (main ts server)
+        
+```
+
+
 ## About the ESP-8266
 In this project, Our team using a NodeMCU ESP-8266, a RFID-RC522, JF-0520B Electric lock and a Relay for electrical isolation. 
 

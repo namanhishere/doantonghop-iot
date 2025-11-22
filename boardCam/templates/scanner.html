@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quét Mã QR</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        h1 {
+            color: #eee;
+            font-weight: 300;
+            font-size: 2.5rem;
+        }
+        img {
+            border: 5px solid #3498db;
+            border-radius: 8px;
+            width: 80vw; /* Điều chỉnh kích thước video */
+            max-width: 800px;
+            height: auto;
+            background-color: #333; /* Nền cho video lỡ có lỗi */
+        }
+        .back-button {
+            margin-top: 30px;
+            display: inline-block;
+            background-color: #e74c3c;
+            color: #ffffff;
+            font-size: 1.5rem;
+            font-weight: 500;
+            text-decoration: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .back-button:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hướng camera vào mã QR của bạn</h1>
+    
+    <img src="http://localhost:5000/video_feed" alt="Camera Stream" />
+
+    <a href="dashboard.html" class="back-button">Quay lại Màn hình chính</a>
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiosk - Phòng 101</title>
+    <style>
+        /* --- CSS Reset & Base --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #1a1a1a;
+            /* Nền tối cho Kiosk */
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 40px;
+            overflow: hidden;
+            /* Ẩn thanh cuộn */
+        }
+
+        /* --- Vùng Thông báo (Trạng thái kết nối) --- */
+        #status-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+            background-color: #555;
+            color: #fff;
+            z-index: 1000;
+            display: none;
+            /* Ẩn ban đầu */
+        }
+
+        #status-bar.error {
+            background-color: #e74c3c;
+            display: block;
+        }
+
+        #status-bar.success {
+            background-color: #2ecc71;
+            display: block;
+            opacity: 0;
+            animation: fadeOut 2s 1s forwards;
+            /* Tự động mờ đi */
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+                display: none;
+            }
+        }
+
+
+        /* --- Header: Đồng hồ --- */
+        .header {
+            text-align: right;
+            margin-bottom: 40px;
+        }
+
+        #clock-time {
+            font-size: 7rem;
+            font-weight: 200;
+            letter-spacing: -2px;
+            line-height: 1;
+        }
+
+        #clock-date {
+            font-size: 1.75rem;
+            font-weight: 400;
+            opacity: 0.7;
+        }
+
+        /* --- Nội dung chính: Phiên tiếp theo --- */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .session-info {
+            border-left: 5px solid #3498db;
+            padding-left: 25px;
+        }
+
+        .session-info h2 {
+            font-size: 2rem;
+            font-weight: 300;
+            opacity: 0.6;
+        }
+
+        .session-info #session-title {
+            font-size: 3.5rem;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+
+        .session-info #session-details {
+            font-size: 2.25rem;
+            font-weight: 300;
+        }
+
+        .no-session {
+            font-size: 3rem;
+            font-weight: 300;
+            opacity: 0.5;
+        }
+
+        /* --- Footer: Nút hành động --- */
+        .footer {
+            text-align: center;
+            padding-top: 40px;
+        }
+
+        .qr-button {
+            display: inline-block;
+            background-color: #3498db;
+            color: #ffffff;
+            font-size: 2rem;
+            font-weight: 500;
+            text-decoration: none;
+            padding: 25px 60px;
+            border-radius: 12px;
+            transition: background-color 0.2s;
+        }
+
+        .qr-button:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="status-bar">Đang kết nối...</div>
+
+    <header class="header">
+        <div id="clock-time">11:36</div>
+        <div id="clock-date">Thứ Ba, 18 Tháng 11, 2025</div>
+    </header>
+
+    <main class="main-content">
+        <div class="session-info">
+            <h2></h2>
+            <h1 id="session-title"></h1>
+            <p id="session-details"></p>
+
+        </div>
+    </main>
+
+    <footer class="footer">
+        <a href="/scanner" class="qr-button">Quét Mã QR để Check-in</a>
+    </footer>
+
+    <script>
+
+        const WS_URL = "wss://doantonghopiot.namanhishere.com/ws";
+        const ROOM_ID = "101";
+
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const clockTime = document.getElementById("clock-time");
+            const clockDate = document.getElementById("clock-date");
+            const sessionTitle = document.getElementById("session-title");
+            const sessionDetails = document.getElementById("session-details");
+            const sessionLabel = document.querySelector(".session-info h2");
+            const statusBar = document.getElementById("status-bar");
+
+
+            function updateClock() {
+                const now = new Date();
+                const time = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                const date = now.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+                clockTime.textContent = time;
+                clockDate.textContent = date;
+            }
+            setInterval(updateClock, 1000);
+            updateClock();
+
+
+            function connect() {
+                const ws = new WebSocket(WS_URL);
+
+                ws.onopen = () => {
+                    console.log("Đã kết nối tới WebSocket server.");
+                    showStatus("Đã kết nối!", "success");
+
+
+                    ws.send(JSON.stringify({
+                        type: "identification",
+                        role: "kiosk",
+                        room: ROOM_ID
+                    }));
+
+
+                    ws.send(JSON.stringify({
+                        type: "get_session_info",
+                        room: ROOM_ID
+                    }));
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log("Nhận được data:", data);
+
+
+                        if (data.type === "session_update") {
+                            updateSessionInfo(data.payload);
+                        }
+
+
+                        if (data.type === "checkin_success") {
+                            showStatus(`Chào mừng, ${data.userName}!`, "success");
+                        }
+
+                    } catch (e) {
+                        console.error("Lỗi parse JSON:", e);
+                    }
+                };
+
+                ws.onclose = () => {
+                    console.log("Đã mất kết nối. Thử kết nối lại sau 5 giây.");
+                    showStatus("Mất kết nối. Đang thử lại...", "error");
+                    setTimeout(connect, 5000);
+                };
+
+                ws.onerror = (err) => {
+                    console.error("Lỗi WebSocket:", err);
+                    showStatus("Lỗi kết nối WebSocket.", "error");
+                    ws.close();
+                };
+            }
+
+
+            function updateSessionInfo(session) {
+                if (session && session.title) {
+                    sessionTitle.textContent = session.title;
+                    sessionDetails.textContent = `Người đặt: ${session.organizer}`;
+                    sessionLabel.textContent = `Phiên Tiếp Theo (${session.startTime})`;
+                } else {
+                    sessionTitle.textContent = "Không có phiên nào sắp diễn ra";
+                    sessionDetails.textContent = "Phòng đang trống";
+                    sessionLabel.textContent = "Hiện tại";
+                }
+            }
+
+            function showStatus(message, type = "error") {
+                statusBar.textContent = message;
+                statusBar.className = type;
+            }
+
+
+            connect();
+            updateSessionInfo();
+        });
+    </script>
+</body>
+
+</html>
