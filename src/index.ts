@@ -121,7 +121,8 @@ wss.on("connection", (ws: IOTClient) => {
 
 
 app.get("/", (req, res) => {
-    res.render("index");
+    // res.render("index");
+    res.send(`This is an test channel of the Programming Intergration Project (CO3103) in Sem 251.\nThis is a test channel and the board live only when under development condition. Currently there are ${espClients.size} devices(s) working`)
 });
 
 
