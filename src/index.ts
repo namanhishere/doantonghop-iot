@@ -16,11 +16,11 @@ const wss = new WebSocketServer({ server, path: "/ws" });
 
 
 const db = await mysql.createConnection({
-  host: "localhost",
-  port: 1307,
-  user: "user",
-  password: "userpass",
-  database: "mydb",
+    host: "localhost",
+    port: 1307,
+    user: "user",
+    password: "userpass",
+    database: "mydb",
 });
 
 try {
@@ -46,7 +46,7 @@ const IOTClients: Map<string, IOTClient> = new Map();
 wss.on("connection", (ws: IOTClient) => {
     console.log("New client connected");
 
-    ws.on("message",  async (msg: Buffer) => {
+    ws.on("message", async (msg: Buffer) => {
         let data: any;// any in ts :v
         try {
             data = JSON.parse(msg.toString());
@@ -56,7 +56,7 @@ wss.on("connection", (ws: IOTClient) => {
             return;
         }
 
-        
+
         switch (data.type) {
             case "identification":
                 if (data.room) {
@@ -66,42 +66,84 @@ wss.on("connection", (ws: IOTClient) => {
                 }
                 break;
 
-                case "rfid":
-                    if (data.uid && data.room) {
-                        try {
-                            const [rows] : any[] = await db.execute(
-                                `SELECT a.card_uid, a.room_id
+            case "rfid":
+                if (data.uid && data.room) {
+                    try {
+                        const [rows]: any[] = await db.execute(
+                            `SELECT a.card_uid, a.room_id
                                  FROM rfid_access a
                                  JOIN rfid_card c ON a.card_uid = c.uid
                                  JOIN room r ON a.room_id = r.id
                                  WHERE c.uid = ? AND r.id = ?`,
-                                [data.uid, data.room]
-                            );
-                
-                            let status = "DENIED";
-                
-                            console.log("RFID check:", rows, [data.uid, data.room]);
-                
-                            if (rows.length > 0) {
-                                status = "AUTHORIZED";
-                                await db.execute(
-                                    `INSERT INTO opencloselog (room_id, action, card_uid)
-                                     VALUES (?, 'OPEN', ?)`,
-                                    [rows[0].room_id, rows[0].card_uid]
-                                );
-                            }
-                            ws.send(JSON.stringify({ type: "auth", status }));
-                            console.log(`[RFID] ${data.uid} → ${status}`);
-                
-                        } catch (err) {
-                            console.error("Failed to check or log RFID access:", err);
-                            ws.send(JSON.stringify({ type: "auth", status: "ERROR" }));
-                        }
-                    } else {
-                        console.warn("Invalid RFID data received:", data);
-                    }
-                    break;
+                            [data.uid, data.room]
+                        );
 
+                        let status = "DENIED";
+
+                        console.log("RFID check:", rows, [data.uid, data.room]);
+
+                        if (rows.length > 0) {
+                            status = "AUTHORIZED";
+                            await db.execute(
+                                `INSERT INTO opencloselog (room_id, action, card_uid)
+                                     VALUES (?, 'OPEN', ?)`,
+                                [rows[0].room_id, rows[0].card_uid]
+                            );
+                        }
+                        ws.send(JSON.stringify({ type: "auth", status }));
+                        console.log(`[RFID] ${data.uid} → ${status}`);
+
+                    } catch (err) {
+                        console.error("Failed to check or log RFID access:", err);
+                        ws.send(JSON.stringify({ type: "auth", status: "ERROR" }));
+                    }
+                } else {
+                    console.warn("Invalid RFID data received:", data);
+                }
+                break;
+
+            case "qr_scan":
+                // data.qrData = nội dung mã QR
+                // data.room = phòng mà Kiosk này đang quản lý
+                if (data.qrData && data.room) {
+                    try {
+                        // Giả sử: Mã QR là một token/ID của một lịch hẹn (booking)
+                        // Query này kiểm tra xem có lịch hẹn hợp lệ cho phòng này
+                        // và đang trong thời gian diễn ra hay không.
+                        const [rows]: any[] = await db.execute(
+                            `SELECT b.id, b.room_id
+                                                     FROM bookings b 
+                                                     WHERE b.qr_token = ? AND b.room_id = ?
+                                                       AND NOW() BETWEEN b.start_time AND b.end_time`,
+                            [data.qrData, data.room]
+                        );
+
+                        if (rows.length > 0) {
+                            // Hợp lệ! Tìm ESP của phòng này
+                            const esp = IOTClients.get(data.room);
+                            if (esp) {
+                                // Gửi lệnh "AUTHORIZED" cho ESP (giống như RFID)
+                                esp.send(JSON.stringify({ type: "auth", status: "AUTHORIZED" }));
+                                console.log(`[QR] ${data.qrData} → AUTHORIZED for room ${data.room}`);
+
+                                // Ghi log
+                                await db.execute(
+                                    `INSERT INTO opencloselog (room_id, action, booking_id)
+                                                    _VALUES (?, 'OPEN', ?)`,
+                                    [data.room, rows[0].id]
+                                );
+                            } else {
+                                console.warn(`[QR] Auth OK nhưng không tìm thấy ESP client cho phòng ${data.room}`);
+                            }
+                        } else {
+                            // Không hợp lệ
+                            console.log(`[QR] ${data.qrData} → DENIED for room ${data.room}`);
+                        }
+                    } catch (err) {
+                        console.error("Lỗi xử lý QR scan:", err);
+                    }
+                }
+                break;
 
             default:
                 console.log("Unknown message type:", data.type);
@@ -109,7 +151,7 @@ wss.on("connection", (ws: IOTClient) => {
     });
 
     ws.on("close", () => {
-        
+
         if (ws.roomId) {
             IOTClients.delete(ws.roomId); 
             console.log(`Client for room ${ws.roomId} disconnected and unregistered.`);
@@ -137,8 +179,8 @@ app.get("/open-door", async (req: express.Request, res: express.Response) => {
         return res.status(400).send("Missing 'source' query parameter");
     }
 
-    room  = String(room || "").trim();
-    source  = String(source || "").trim();
+    room = String(room || "").trim();
+    source = String(source || "").trim();
 
     const trigger = source && source.toUpperCase() === "EXTERNAL" ? "EXTERNAL" : "CONSOLE";
 
@@ -178,8 +220,8 @@ app.get("/close-door", async (req: express.Request, res: express.Response) => {
         return res.status(400).send("Missing 'source' query parameter");
     }
 
-    room  = String(room || "").trim();
-    source  = String(source || "").trim();
+    room = String(room || "").trim();
+    source = String(source || "").trim();
 
     const trigger = source && source.toUpperCase() === "EXTERNAL" ? "EXTERNAL" : "CONSOLE";
 
