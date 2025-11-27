@@ -1,2 +1,7 @@
 node_modules
 docker
+*.env
+dist
+.vscode
+__pycache__
+*/venv

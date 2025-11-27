@@ -8,7 +8,8 @@ from flask import Flask, Response, render_template
 import threading
 import queue
 
-WS_URL = "wss://doantonghopiot.namanhishere.com/ws" 
+# WS_URL = "wss://doantonghopiot.namanhishere.com/ws"
+WS_URL = "ws://localhost:1836/ws" 
 ROOM_ID = "101" 
 FLASK_PORT = 5000 
 
@@ -100,8 +101,8 @@ def generate_frames():
                 
                 (x, y, w, h) = qr.rect
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 3)
-                cv2.putText(frame, qr_data, (x, y - 10), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                # cv2.putText(frame, qr_data, (x, y - 10), 
+                #             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
             ret, buffer = cv2.imencode('.jpg', frame)
             if not ret:
@@ -116,18 +117,15 @@ def generate_frames():
 
 @app.route('/')
 def dashboard():
-    """Phục vụ trang dashboard chính."""
     return render_template('dashboard.html')
 
 @app.route('/scanner')
 def scanner():
-    """Phục vụ trang quét QR."""
     return render_template('scanner.html')
 
 
 @app.route('/video_feed')
 def video_feed():
-    """Tuyến đường (route) cung cấp luồng video."""
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 

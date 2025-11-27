@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Access Control Dashboard</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { background-color: #f8f9fa; }
+        .card { margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: none; }
+        .card-header { background-color: #fff; border-bottom: 1px solid #eee; font-weight: bold; }
+        .btn-action { margin-right: 5px; }
+        .status-badge { font-size: 0.8em; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-primary mb-4">
+    <div class="container">
+        <span class="navbar-brand mb-0 h1"><i class="fa-solid fa-door-open"></i> IoT Access Control System</span>
+    </div>
+</nav>
+
+<div class="container">
+    
+    <!-- ROW 1: ROOMS MANAGEMENT -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-building"></i> Room Management</span>
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addRoomModal">
+                        <i class="fa-solid fa-plus"></i> Add Room
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Room Name</th>
+                                    <th>Controls</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="roomTableBody">
+                                <!-- Data loaded via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- COL 1: RFID CARDS -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-id-card"></i> RFID Cards</span>
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addCardModal">
+                        <i class="fa-solid fa-plus"></i> Add Card
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>UID</th>
+                                    <th>Owner Name</th>
+                                    <th>Access To</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cardTableBody">
+                                <!-- Data loaded via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <hr>
+                    <h6>Grant Access</h6>
+                    <form id="grantAccessForm" class="row g-2">
+                        <div class="col-md-5">
+                            <select class="form-select form-select-sm" id="accessCardSelect" required>
+                                <option value="" selected disabled>Select Card...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <select class="form-select form-select-sm" id="accessRoomSelect" required>
+                                <option value="" selected disabled>Select Room...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-sm btn-primary w-100">Grant</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- COL 2: QR GENERATOR -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fa-solid fa-qrcode"></i> QR Session Generator
+                </div>
+                <div class="card-body">
+                    <form id="qrForm">
+                        <div class="mb-3">
+                            <label class="form-label">Select Room</label>
+                            <select class="form-select" id="qrRoomSelect" required>
+                                <!-- Loaded via JS -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Duration (Minutes)</label>
+                            <input type="number" class="form-control" id="qrDuration" value="60" min="1">
+                        </div>
+                        <button type="submit" class="btn btn-dark w-100">Generate QR Token</button>
+                    </form>
+
+                    <div id="qrResult" class="mt-3 p-3 bg-light border rounded d-none text-center">
+                        <p class="mb-1 text-muted">Token ID:</p>
+                        <h5 id="qrTokenDisplay" class="text-break font-monospace text-primary"></h5>
+                        <small id="qrTimeDisplay" class="text-danger"></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Sessions List -->
+            <div class="card">
+                <div class="card-header">Active Sessions</div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush" id="sessionList">
+                        <!-- Loaded via JS -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Add Room -->
+<div class="modal fade" id="addRoomModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Room</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addRoomForm">
+                    <div class="mb-3">
+                        <label>Room ID (e.g., 101)</label>
+                        <input type="text" class="form-control" id="newRoomId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Room Name (e.g., Lab 1)</label>
+                        <input type="text" class="form-control" id="newRoomName" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Add Card -->
+<div class="modal fade" id="addCardModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add RFID Card</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCardForm">
+                    <div class="mb-3">
+                        <label>Card UID (Hex)</label>
+                        <input type="text" class="form-control" id="newCardUid" placeholder="E.g. E5C0F111" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Owner Name</label>
+                        <input type="text" class="form-control" id="newCardName" placeholder="E.g. John Doe" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- APP LOGIC -->
+<script>
+    // --- 1. LOAD DATA ---
+    document.addEventListener('DOMContentLoaded', () => {
+        loadRooms();
+        loadCards();
+        loadSessions();
+    });
+
+    async function loadRooms() {
+        const res = await fetch('/api/rooms');
+        const rooms = await res.json();
+        
+        const tbody = document.getElementById('roomTableBody');
+        const selectQr = document.getElementById('qrRoomSelect');
+        const selectAccess = document.getElementById('accessRoomSelect');
+        
+        tbody.innerHTML = '';
+        selectQr.innerHTML = '<option value="" disabled selected>Select Room</option>';
+        selectAccess.innerHTML = '<option value="" disabled selected>Select Room</option>';
+
+        rooms.forEach(room => {
+            // Populate Table
+            tbody.innerHTML += `
+                <tr>
+                    <td>${room.id}</td>
+                    <td>${room.roomname}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-success" onclick="controlDoor('${room.id}', 'OPEN')">Open</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="controlDoor('${room.id}', 'CLOSE')">Close</button>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="deleteRoom('${room.id}')"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+            // Populate Dropdowns
+            const option = `<option value="${room.id}">${room.roomname} (${room.id})</option>`;
+            selectQr.innerHTML += option;
+            selectAccess.innerHTML += option;
+        });
+    }
+
+    async function loadCards() {
+        const res = await fetch('/api/cards');
+        const cards = await res.json();
+        
+        const tbody = document.getElementById('cardTableBody');
+        const selectAccess = document.getElementById('accessCardSelect');
+        
+        tbody.innerHTML = '';
+        selectAccess.innerHTML = '<option value="" disabled selected>Select Card</option>';
+
+        cards.forEach(card => {
+            // Format access rooms as badges
+            let accessBadges = '<span class="text-muted small">None</span>';
+            if(card.access_rooms) {
+                accessBadges = card.access_rooms.split(',').map(r => 
+                    `<span class="badge bg-info text-dark me-1" onclick="revokeAccess('${card.uid}', '${r}')" style="cursor:pointer" title="Click to remove">${r} &times;</span>`
+                ).join('');
+            }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td class="font-monospace">${card.uid}</td>
+                    <td>${card.cardname}</td>
+                    <td>${accessBadges}</td>
+                    <td></td>
+                </tr>
+            `;
+            
+            selectAccess.innerHTML += `<option value="${card.uid}">${card.cardname} (${card.uid})</option>`;
+        });
+    }
+
+    async function loadSessions() {
+        const res = await fetch('/api/sessions');
+        const sessions = await res.json();
+        const list = document.getElementById('sessionList');
+        list.innerHTML = '';
+
+        sessions.forEach(s => {
+            const now = new Date();
+            const end = new Date(s.endtime);
+            const isActive = now < end;
+            
+            list.innerHTML += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="fw-bold">Room ${s.room_id}</small><br>
+                        <small class="text-muted" style="font-size:0.7em">${s.id}</small>
+                    </div>
+                    <span class="badge ${isActive ? 'bg-success' : 'bg-secondary'} rounded-pill">
+                        ${isActive ? 'Active' : 'Expired'}
+                    </span>
+                </li>
+            `;
+        });
+    }
+
+    // --- 2. ACTIONS ---
+
+    // Create Room
+    document.getElementById('addRoomForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('newRoomId').value;
+        const roomname = document.getElementById('newRoomName').value;
+
+        await fetch('/api/rooms', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ id, roomname })
+        });
+        
+        // Close modal and reload
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addRoomModal'));
+        modal.hide();
+        e.target.reset();
+        loadRooms();
+    });
+
+    // Delete Room
+    async function deleteRoom(id) {
+        if(!confirm('Are you sure? This might fail if logs exist.')) return;
+        const res = await fetch(`/api/rooms/${id}`, { method: 'DELETE' });
+        if(res.ok) loadRooms();
+        else alert("Failed to delete. Check console/logs.");
+    }
+
+    // Create Card
+    document.getElementById('addCardForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const uid = document.getElementById('newCardUid').value;
+        const cardname = document.getElementById('newCardName').value;
+
+        await fetch('/api/cards', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ uid, cardname })
+        });
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addCardModal'));
+        modal.hide();
+        e.target.reset();
+        loadCards();
+    });
+
+    // Grant Access
+    document.getElementById('grantAccessForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const uid = document.getElementById('accessCardSelect').value;
+        const room_id = document.getElementById('accessRoomSelect').value;
+
+        const res = await fetch('/api/cards/access', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ uid, room_id })
+        });
+
+        if(res.ok) {
+            loadCards();
+        } else {
+            alert("Failed to grant access (maybe already exists?)");
+        }
+    });
+
+    // Revoke Access (Clicking on the badge)
+    async function revokeAccess(uid, room_id) {
+        if(!confirm(`Remove access for card ${uid} to room ${room_id}?`)) return;
+        
+        await fetch('/api/cards/access', {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ uid, room_id })
+        });
+        loadCards();
+    }
+
+    // Generate QR
+    document.getElementById('qrForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const room_id = document.getElementById('qrRoomSelect').value;
+        const duration_minutes = document.getElementById('qrDuration').value;
+
+        const res = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ room_id, duration_minutes })
+        });
+
+        const data = await res.json();
+        
+        // Show Result
+        const resultDiv = document.getElementById('qrResult');
+        resultDiv.classList.remove('d-none');
+        document.getElementById('qrTokenDisplay').innerText = data.qr_code;
+        document.getElementById('qrTimeDisplay').innerText = `Valid until: ${new Date(data.valid_until).toLocaleTimeString()}`;
+        
+        loadSessions();
+    });
+
+    // Door Control
+    async function controlDoor(room, action) {
+        const endpoint = action === 'OPEN' ? '/open-door' : '/close-door';
+        try {
+            const res = await fetch(`${endpoint}?room=${room}&source=CONSOLE`);
+            const text = await res.text();
+            alert(text);
+        } catch (e) {
+            alert("Error connecting to server");
+        }
+    }
+
+</script>
+</body>
+</html>

@@ -1,18 +1,45 @@
+//                            _
+//                         _ooOoo_
+//                        o8888888o
+//                        88" . "88
+//                        (| -_- |)
+//                        O\  =  /O
+//                     ____/`---'\____
+//                   .'  \\|     |//  `.
+//                  /  \\|||  :  |||//  \
+//                 /  _||||| -:- |||||_  \
+//                 |   | \\\  -  /'| |   |
+//                 | \_|  `\`---'//  |_/ |
+//                 \  .-\__ `-. -'__/-.  /
+//               ___`. .'  /--.--\  `. .'___
+//            ."" '<  `.___\_<|>_/___.' _> \"".
+//           | | :  `- \`. ;`. _/; .'/ /  .' ; |
+//           \  \ `-.   \_\_`. _.'_/_/  -' _.' /
+// ===========`-.`___`-.__\ \___  /__.-'_.'_.-'================
+//                         `=--=-'                            
+// hope it not fail
+
+
 import express from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 import path from "path";
 import mysql from "mysql2/promise";
 import { fileURLToPath } from "url";
+import { v4 as uuidv4 } from "uuid"; 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = process.cwd();
-
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.set("views", path.resolve("views"));
+app.set("view engine", "ejs");
+app.use(express.static(path.resolve("public")));
 
 
 const db = await mysql.createConnection({
@@ -24,30 +51,23 @@ const db = await mysql.createConnection({
 });
 
 try {
-    // await db.connect();
     console.log("MySQL connected successfully!");
 } catch (err) {
     console.error("MySQL connection failed:", err);
 }
 
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
 
-app.use(express.static(path.join(__dirname, "public")));
-
-// const allowedUIDs = new Set(["C1A3B506-101", "C1AB3506-101"]);
 
 interface IOTClient extends WebSocket {
-  roomId?: string;
+    roomId?: string;
 }
 const IOTClients: Map<string, IOTClient> = new Map();
-
 
 wss.on("connection", (ws: IOTClient) => {
     console.log("New client connected");
 
     ws.on("message", async (msg: Buffer) => {
-        let data: any;// any in ts :v
+        let data: any;
         try {
             data = JSON.parse(msg.toString());
             console.log("Received:", data);
@@ -56,13 +76,19 @@ wss.on("connection", (ws: IOTClient) => {
             return;
         }
 
-
         switch (data.type) {
             case "identification":
                 if (data.room) {
-                    ws.roomId = data.room; 
-                    IOTClients.set(data.room, ws); 
-                    console.log(`Client for room ${data.room} registered.`);
+                    ws.roomId = data.room;
+                    
+                    // Only add to the Map if it is the ESP/Hardware (NOT the kiosk)
+                    // Assuming your ESP doesn't send a role, or sends 'esp'
+                    if (data.role !== 'kiosk') { 
+                        IOTClients.set(data.room, ws);
+                        console.log(`ESP Client for room ${data.room} registered.`);
+                    } else {
+                        console.log(`Kiosk connected for room ${data.room} (Not registered as Door Controller).`);
+                    }
                 }
                 break;
 
@@ -71,22 +97,20 @@ wss.on("connection", (ws: IOTClient) => {
                     try {
                         const [rows]: any[] = await db.execute(
                             `SELECT a.card_uid, a.room_id
-                                 FROM rfid_access a
-                                 JOIN rfid_card c ON a.card_uid = c.uid
-                                 JOIN room r ON a.room_id = r.id
-                                 WHERE c.uid = ? AND r.id = ?`,
+                             FROM rfid_access a
+                             JOIN rfid_card c ON a.card_uid = c.uid
+                             JOIN room r ON a.room_id = r.id
+                             WHERE c.uid = ? AND r.id = ?`,
                             [data.uid, data.room]
                         );
 
                         let status = "DENIED";
 
-                        console.log("RFID check:", rows, [data.uid, data.room]);
-
                         if (rows.length > 0) {
                             status = "AUTHORIZED";
                             await db.execute(
                                 `INSERT INTO opencloselog (room_id, action, card_uid)
-                                     VALUES (?, 'OPEN', ?)`,
+                                 VALUES (?, 'OPEN', ?)`,
                                 [rows[0].room_id, rows[0].card_uid]
                             );
                         }
@@ -97,50 +121,40 @@ wss.on("connection", (ws: IOTClient) => {
                         console.error("Failed to check or log RFID access:", err);
                         ws.send(JSON.stringify({ type: "auth", status: "ERROR" }));
                     }
-                } else {
-                    console.warn("Invalid RFID data received:", data);
                 }
                 break;
 
             case "qr_scan":
-                // data.qrData = nội dung mã QR
-                // data.room = phòng mà Kiosk này đang quản lý
                 if (data.qrData && data.room) {
                     try {
-                        // Giả sử: Mã QR là một token/ID của một lịch hẹn (booking)
-                        // Query này kiểm tra xem có lịch hẹn hợp lệ cho phòng này
-                        // và đang trong thời gian diễn ra hay không.
                         const [rows]: any[] = await db.execute(
-                            `SELECT b.id, b.room_id
-                                                     FROM bookings b 
-                                                     WHERE b.qr_token = ? AND b.room_id = ?
-                                                       AND NOW() BETWEEN b.start_time AND b.end_time`,
+                            `SELECT s.id, s.room_id
+                             FROM qr_session s 
+                             WHERE s.id = ? AND s.room_id = ?`,
                             [data.qrData, data.room]
                         );
 
                         if (rows.length > 0) {
-                            // Hợp lệ! Tìm ESP của phòng này
+                            // console.log(esp);
                             const esp = IOTClients.get(data.room);
+                            console.log(IOTClients);
                             if (esp) {
-                                // Gửi lệnh "AUTHORIZED" cho ESP (giống như RFID)
                                 esp.send(JSON.stringify({ type: "auth", status: "AUTHORIZED" }));
                                 console.log(`[QR] ${data.qrData} → AUTHORIZED for room ${data.room}`);
 
-                                // Ghi log
                                 await db.execute(
-                                    `INSERT INTO opencloselog (room_id, action, booking_id)
-                                                    _VALUES (?, 'OPEN', ?)`,
+                                    `INSERT INTO opencloselog (room_id, action, qr_id)
+                                     VALUES (?, 'OPEN', ?)`,
                                     [data.room, rows[0].id]
                                 );
                             } else {
-                                console.warn(`[QR] Auth OK nhưng không tìm thấy ESP client cho phòng ${data.room}`);
+                                console.warn(`[QR] Auth OK but ESP not found for room ${data.room}`);
                             }
                         } else {
-                            // Không hợp lệ
                             console.log(`[QR] ${data.qrData} → DENIED for room ${data.room}`);
                         }
                     } catch (err) {
-                        console.error("Lỗi xử lý QR scan:", err);
+                        console.error("Error processing QR scan:", err);
                     }
                 }
                 break;
@@ -151,105 +165,187 @@ wss.on("connection", (ws: IOTClient) => {
     });
 
     ws.on("close", () => {
-
         if (ws.roomId) {
-            IOTClients.delete(ws.roomId); 
-            console.log(`Client for room ${ws.roomId} disconnected and unregistered.`);
-        } else {
-            console.log("Client disconnected (was never identified).");
+            const storedClient = IOTClients.get(ws.roomId);
+            
+            // Only delete if the disconnected client is the one currently stored
+            if (storedClient === ws) {
+                IOTClients.delete(ws.roomId);
+                console.log(`ESP Client for room ${ws.roomId} disconnected.`);
+            } else {
+                console.log(`Auxiliary client (Kiosk/UI) for room ${ws.roomId} disconnected.`);
+            }
         }
     });
 });
 
 
-app.get("/", (req, res) => {
-    // res.render("index");
-    res.send(`This is an test channel of the Programming Intergration Project (CO3103) in Sem 251.\nThis is a test channel and the board live only when under development condition. Currently there are ${IOTClients.size} devices(s) working`)
+
+
+app.get("/api/rooms", async (req, res) => {
+    try {
+        const [rows] = await db.execute("SELECT * FROM room");
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err });
+    }
 });
+
+app.post("/api/rooms", async (req, res) => {
+    const { id, roomname } = req.body;
+    if (!id || !roomname) return res.status(400).send("Missing id or roomname");
+    try {
+        await db.execute("INSERT INTO room (id, roomname) VALUES (?, ?)", [id, roomname]);
+        res.status(201).send("Room created");
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete("/api/rooms/:id", async (req, res) => {
+    
+    try {
+        await db.execute("DELETE FROM room WHERE id = ?", [req.params.id]);
+        res.send("Room deleted");
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+app.get("/api/cards", async (req, res) => {
+    try {
+        const query = `
+            SELECT c.uid, c.cardname, GROUP_CONCAT(a.room_id) as access_rooms
+            FROM rfid_card c
+            LEFT JOIN rfid_access a ON c.uid = a.card_uid
+            GROUP BY c.uid
+        `;
+        const [rows] = await db.execute(query);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err });
+    }
+});
+
+app.post("/api/cards", async (req, res) => {
+    const { uid, cardname } = req.body;
+    if (!uid || !cardname) return res.status(400).send("Missing uid or cardname");
+    try {
+        await db.execute("INSERT INTO rfid_card (uid, cardname) VALUES (?, ?)", [uid, cardname]);
+        res.status(201).send("Card created");
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+app.post("/api/cards/access", async (req, res) => {
+    const { uid, room_id } = req.body;
+    try {
+        await db.execute("INSERT INTO rfid_access (card_uid, room_id) VALUES (?, ?)", [uid, room_id]);
+        res.status(201).send("Access granted");
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+app.delete("/api/cards/access", async (req, res) => {
+    const { uid, room_id } = req.body;
+    try {
+        await db.execute("DELETE FROM rfid_access WHERE card_uid = ? AND room_id = ?", [uid, room_id]);
+        res.send("Access revoked");
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+app.get("/api/sessions", async (req, res) => {
+    try {
+        const [rows] = await db.execute("SELECT * FROM qr_session ORDER BY starttime DESC");
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err });
+    }
+});
+
+app.post("/api/sessions", async (req, res) => {
+    const { room_id, duration_minutes } = req.body;
+    if (!room_id || !duration_minutes) return res.status(400).send("Missing room_id or duration");
+
+    const id = uuidv4(); 
+    
+    const startTime = new Date();
+    const endTime = new Date(startTime.getTime() + duration_minutes * 60000);
+
+    try {
+        await db.execute(
+            "INSERT INTO qr_session (id, starttime, endtime, room_id) VALUES (?, ?, ?, ?)",
+            [id, startTime, endTime, room_id]
+        );
+        res.status(201).json({ message: "Session created", qr_code: id, valid_until: endTime });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 
 app.get("/open-door", async (req: express.Request, res: express.Response) => {
-    // https://doantonghopiot.namanhishere.com/open-door?room=101&source=CONSOLE
     let { room, source } = req.query;
+    if (!room || !source) return res.status(400).send("Missing parameters");
 
-    if (!room) {
-        return res.status(400).send("Missing 'room' query parameter");
-    }
-    if (!source) {
-        return res.status(400).send("Missing 'source' query parameter");
-    }
-
-    room = String(room || "").trim();
-    source = String(source || "").trim();
-
-    const trigger = source && source.toUpperCase() === "EXTERNAL" ? "EXTERNAL" : "CONSOLE";
+    room = String(room).trim();
+    source = String(source).trim();
+    const trigger = source.toUpperCase() === "EXTERNAL" ? "EXTERNAL" : "CONSOLE";
 
     try {
-        // Tìm client ESP tương ứng
         const ws = IOTClients.get(room);
-
         if (ws) {
             ws.send("OPEN_DOOR");
-            console.log(`Sent OPEN_DOOR to room ${room} via ${trigger}`);
-
-            // Ghi log mở cửa
             await db.execute(
-                `INSERT INTO opencloselog (room_id, action, web_trigger)
-                 VALUES (?, 'OPEN', ?)`,
+                `INSERT INTO opencloselog (room_id, action, web_trigger) VALUES (?, 'OPEN', ?)`,
                 [room, trigger]
             );
-
-            res.send(`Door opened for room ${room} (triggered by ${trigger})`);
+            res.send(`Door opened for room ${room}`);
         } else {
-            res.status(404).send(`No active ESP client found for room ${room}`);
+            res.status(404).send(`No active ESP client for room ${room}`);
         }
     } catch (err) {
-        console.error("Failed to open door:", err);
-        res.status(500).send("Internal Server Error");
+        console.error(err);
+        res.status(500).send("Error");
     }
 });
+
 app.get("/close-door", async (req: express.Request, res: express.Response) => {
-    // https://doantonghopiot.namanhishere.com/close-door?room=101&source=EXTERNAL
     let { room, source } = req.query;
+    if (!room || !source) return res.status(400).send("Missing parameters");
 
-
-    if (!room) {
-        return res.status(400).send("Missing 'room' query parameter");
-    }
-    if (!source) {
-        return res.status(400).send("Missing 'source' query parameter");
-    }
-
-    room = String(room || "").trim();
-    source = String(source || "").trim();
-
-    const trigger = source && source.toUpperCase() === "EXTERNAL" ? "EXTERNAL" : "CONSOLE";
+    room = String(room).trim();
+    source = String(source).trim();
+    const trigger = source.toUpperCase() === "EXTERNAL" ? "EXTERNAL" : "CONSOLE";
 
     try {
         const ws = IOTClients.get(room);
-
         if (ws) {
             ws.send("CLOSE_DOOR");
-            console.log(`Sent CLOSE_DOOR to room ${room} via ${trigger}`);
-
-            // Ghi log đóng cửa
             await db.execute(
-                `INSERT INTO opencloselog (room_id, action, web_trigger)
-                 VALUES (?, 'CLOSE', ?)`,
+                `INSERT INTO opencloselog (room_id, action, web_trigger) VALUES (?, 'CLOSE', ?)`,
                 [room, trigger]
             );
-
-            res.send(`Door closed for room ${room} (triggered by ${trigger})`);
+            res.send(`Door closed for room ${room}`);
         } else {
-            res.status(404).send(`No active ESP client found for room ${room}`);
+            res.status(404).send(`No active ESP client for room ${room}`);
         }
     } catch (err) {
-        console.error("Failed to close door:", err);
-        res.status(500).send("Internal Server Error");
+        console.error(err);
+        res.status(500).send("Error");
     }
 });
 
-
+app.get("/", (req, res) => {
+    res.render("index");
+});
 
 server.listen(1836, () => {
     console.log("Server running on port 1836");
