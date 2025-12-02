@@ -17,17 +17,12 @@ FLASK_PORT = 5000
 qr_queue = queue.Queue(maxsize=5) 
 
 
-
-
-
 def websocket_thread_func():
-    
     ws = None
     last_qr_data = None
     last_scan_time = 0
 
     def connect():
-        
         print(f"[Thread WS] Đang cố gắng kết nối tới {WS_URL}...")
         try:
             ws_conn = websocket.create_connection(WS_URL) 
@@ -86,7 +81,6 @@ except Exception as e:
 
 
 def generate_frames():
-    
     print("[Thread Chính] Bắt đầu luồng video...")
     for _ in range(5):
         camera.grab() 
