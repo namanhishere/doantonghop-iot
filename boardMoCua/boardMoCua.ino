@@ -6,8 +6,8 @@
 using namespace websockets;
 
 
-const char* WIFI_SSID = "Namanh";
-const char* WIFI_PASS = ""; //neu ban la nguoi tot, xin dung coi lai commit cu de thay pass wifi nha toi. cam on ban
+const char* WIFI_SSID = "P601";
+const char* WIFI_PASS = "phong601@"; //neu ban la nguoi tot, xin dung coi lai commit cu de thay pass wifi nha toi. cam on ban
 const char* WS_URL = "wss://doantonghopiot.namanhishere.com/ws";
 const char* ROOM_ID = "101"; 
 
@@ -24,7 +24,7 @@ const unsigned long PING_INTERVAL = 15000;
 
 
 unsigned long relayOffTime = 0;
-const unsigned long AUTO_CLOSE_DELAY = 5000; 
+const unsigned long AUTO_CLOSE_DELAY = 1000; 
 
 void setup() {
   Serial.begin(115200);
@@ -128,13 +128,13 @@ void onMessageCallback(WebsocketsMessage msg) {
   else if (data == "OPEN_DOOR") {
     Serial.println("Remote OPEN_DOOR command received");
     digitalWrite(RELAY_PIN, HIGH);
-    relayOffTime = 0; 
+    relayOffTime = millis() + AUTO_CLOSE_DELAY; 
   }
-  else if (data == "CLOSE_DOOR") {
-    Serial.println("Remote CLOSE_DOOR command received");
-    digitalWrite(RELAY_PIN, LOW);
-    relayOffTime = 0; 
-  }
+  // else if (data == "CLOSE_DOOR") {
+  //   Serial.println("Remote CLOSE_DOOR command received");
+  //   digitalWrite(RELAY_PIN, LOW);
+  //   relayOffTime = 0; 
+  // }
 }
 
 void onEventCallback(WebsocketsEvent event, String data) {

@@ -8,7 +8,7 @@ from flask import Flask, Response, render_template
 import threading
 import queue
 
-# WS_URL = "wss://doantonghopiot.namanhishere.com/ws"
+
 WS_URL = "ws://localhost:1836/ws" 
 ROOM_ID = "101" 
 FLASK_PORT = 5000 
@@ -21,13 +21,13 @@ qr_queue = queue.Queue(maxsize=5)
 
 
 def websocket_thread_func():
-    """Hàm này chạy trên một thread riêng biệt, quản lý kết nối và gửi WS."""
+    
     ws = None
     last_qr_data = None
     last_scan_time = 0
 
     def connect():
-        """Hàm con để kết nối (hoặc kết nối lại)."""
+        
         print(f"[Thread WS] Đang cố gắng kết nối tới {WS_URL}...")
         try:
             ws_conn = websocket.create_connection(WS_URL) 
@@ -86,8 +86,17 @@ except Exception as e:
 
 
 def generate_frames():
-    """Hàm generator (giữ nguyên, không thay đổi)"""
+    
     print("[Thread Chính] Bắt đầu luồng video...")
+    for _ in range(5):
+        camera.grab() 
+        
+    
+    while not qr_queue.empty():
+        try:
+            qr_queue.get_nowait()
+        except:
+            pass
     while True:
         success, frame = camera.read()
         if not success:
@@ -101,8 +110,8 @@ def generate_frames():
                 
                 (x, y, w, h) = qr.rect
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 3)
-                # cv2.putText(frame, qr_data, (x, y - 10), 
-                #             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                
+                
 
             ret, buffer = cv2.imencode('.jpg', frame)
             if not ret:

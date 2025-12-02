@@ -26,10 +26,10 @@
         img {
             border: 5px solid #3498db;
             border-radius: 8px;
-            width: 80vw; /* Điều chỉnh kích thước video */
+            width: 80vw;
             max-width: 800px;
             height: auto;
-            background-color: #333; /* Nền cho video lỡ có lỗi */
+            background-color: #333;
         }
         .back-button {
             margin-top: 30px;
@@ -51,8 +51,48 @@
 <body>
     <h1>Hướng camera vào mã QR của bạn</h1>
     
-    <img src="http://localhost:5000/video_feed" alt="Camera Stream" />
+    <!-- Video stream from Python -->
+    <img src="/video_feed" alt="Camera Stream" />
 
-    <a href="dashboard.html" class="back-button">Quay lại Màn hình chính</a>
+    <a href="/" class="back-button">Quay lại Màn hình chính</a>
+
+    <script>
+        const WS_URL = "ws://localhost:1836/ws";
+        const ROOM_ID = "101";
+
+        // Connect to WebSocket to listen for scan results
+        const ws = new WebSocket(WS_URL);
+
+        ws.onopen = () => {
+            console.log("Scanner connected to WS");
+            // Register as scanner (optional, depends on your server logic)
+            ws.send(JSON.stringify({ type: "identification", role: "scanner", room: ROOM_ID }));
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                
+                // When the backend processes the QR (sent by Python) and returns a result:
+                if (data.type === "auth") {
+                    
+                    let status = "error";
+                    let name = "Khách";
+                    
+                    if (data.status === "AUTHORIZED") {
+                        status = "authorized";
+                        console.log("Access Authorized for:", data.name);
+                        window.location.href = `/?status=${status}`;
+                    } else {
+                        status = "error";
+                    }
+
+                    
+                }
+            } catch (e) {
+                console.error("Error parsing WS message:", e);
+            }
+        };
+    </script>
 </body>
 </html>

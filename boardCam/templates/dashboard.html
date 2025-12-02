@@ -7,142 +7,81 @@
     <title>Kiosk - Phòng 101</title>
     <style>
         /* --- CSS Reset & Base --- */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: #1a1a1a;
-            /* Nền tối cho Kiosk */
             color: #ffffff;
             display: flex;
             flex-direction: column;
             height: 100vh;
             padding: 40px;
             overflow: hidden;
-            /* Ẩn thanh cuộn */
         }
 
-        /* --- Vùng Thông báo (Trạng thái kết nối) --- */
+        /* --- Status Bar --- */
         #status-bar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            padding: 8px;
-            text-align: center;
-            font-size: 0.9rem;
-            background-color: #555;
-            color: #fff;
-            z-index: 1000;
-            display: none;
-            /* Ẩn ban đầu */
+            position: fixed; top: 0; left: 0; width: 100%; padding: 8px;
+            text-align: center; font-size: 0.9rem; background-color: #555;
+            color: #fff; z-index: 1000; display: none;
         }
+        #status-bar.error { background-color: #e74c3c; display: block; }
+        #status-bar.success { background-color: #2ecc71; display: block; opacity: 0; animation: fadeOut 2s 1s forwards; }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; display: none; } }
 
-        #status-bar.error {
-            background-color: #e74c3c;
-            display: block;
-        }
+        /* --- Header --- */
+        .header { text-align: right; margin-bottom: 40px; }
+        #clock-time { font-size: 7rem; font-weight: 200; letter-spacing: -2px; line-height: 1; }
+        #clock-date { font-size: 1.75rem; font-weight: 400; opacity: 0.7; }
 
-        #status-bar.success {
-            background-color: #2ecc71;
-            display: block;
-            opacity: 0;
-            animation: fadeOut 2s 1s forwards;
-            /* Tự động mờ đi */
-        }
+        /* --- Main Content --- */
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
+        .session-info { border-left: 5px solid #3498db; padding-left: 25px; }
+        .session-info h2 { font-size: 2rem; font-weight: 300; opacity: 0.6; }
+        .session-info #session-title { font-size: 3.5rem; font-weight: 600; margin: 10px 0; }
+        .session-info #session-details { font-size: 2.25rem; font-weight: 300; }
 
-        @keyframes fadeOut {
-            from {
-                opacity: 1;
-            }
-
-            to {
-                opacity: 0;
-                display: none;
-            }
-        }
-
-
-        /* --- Header: Đồng hồ --- */
-        .header {
-            text-align: right;
-            margin-bottom: 40px;
-        }
-
-        #clock-time {
-            font-size: 7rem;
-            font-weight: 200;
-            letter-spacing: -2px;
-            line-height: 1;
-        }
-
-        #clock-date {
-            font-size: 1.75rem;
-            font-weight: 400;
-            opacity: 0.7;
-        }
-
-        /* --- Nội dung chính: Phiên tiếp theo --- */
-        .main-content {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .session-info {
-            border-left: 5px solid #3498db;
-            padding-left: 25px;
-        }
-
-        .session-info h2 {
-            font-size: 2rem;
-            font-weight: 300;
-            opacity: 0.6;
-        }
-
-        .session-info #session-title {
-            font-size: 3.5rem;
-            font-weight: 600;
-            margin: 10px 0;
-        }
-
-        .session-info #session-details {
-            font-size: 2.25rem;
-            font-weight: 300;
-        }
-
-        .no-session {
-            font-size: 3rem;
-            font-weight: 300;
-            opacity: 0.5;
-        }
-
-        /* --- Footer: Nút hành động --- */
-        .footer {
-            text-align: center;
-            padding-top: 40px;
-        }
-
+        /* --- Footer --- */
+        .footer { text-align: center; padding-top: 40px; }
         .qr-button {
-            display: inline-block;
-            background-color: #3498db;
-            color: #ffffff;
-            font-size: 2rem;
-            font-weight: 500;
-            text-decoration: none;
-            padding: 25px 60px;
-            border-radius: 12px;
-            transition: background-color 0.2s;
+            display: inline-block; background-color: #3498db; color: #ffffff;
+            font-size: 2rem; font-weight: 500; text-decoration: none;
+            padding: 25px 60px; border-radius: 12px; transition: background-color 0.2s;
         }
+        .qr-button:hover { background-color: #2980b9; }
 
-        .qr-button:hover {
-            background-color: #2980b9;
+        /* --- POPUP MODAL STYLES --- */
+        #popup-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 2000;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
         }
+        #popup-overlay.active { opacity: 1; pointer-events: auto; }
+        
+        .popup-card {
+            background: #2c2c2c; width: 60%; max-width: 600px;
+            padding: 40px; border-radius: 20px; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transform: scale(0.8); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #popup-overlay.active .popup-card { transform: scale(1); }
+
+        .popup-icon { font-size: 5rem; margin-bottom: 20px; }
+        .popup-title { font-size: 2.5rem; margin-bottom: 10px; font-weight: bold; }
+        .popup-message { font-size: 1.5rem; opacity: 0.8; }
+
+        /* Popup Variants */
+        .popup-card.success { border-top: 10px solid #2ecc71; }
+        .popup-card.success .popup-icon { color: #2ecc71; }
+        
+        .popup-card.error { border-top: 10px solid #e74c3c; }
+        .popup-card.error .popup-icon { color: #e74c3c; }
+
+        .popup-card.info { border-top: 10px solid #f1c40f; }
+        .popup-card.info .popup-icon { color: #f1c40f; }
+
     </style>
 </head>
 
@@ -150,17 +89,25 @@
 
     <div id="status-bar">Đang kết nối...</div>
 
+    <!-- POPUP HTML -->
+    <div id="popup-overlay">
+        <div class="popup-card" id="popup-card">
+            <div class="popup-icon" id="popup-icon">✔</div>
+            <div class="popup-title" id="popup-title">Thành công</div>
+            <div class="popup-message" id="popup-message">Cửa đã mở</div>
+        </div>
+    </div>
+
     <header class="header">
-        <div id="clock-time">11:36</div>
-        <div id="clock-date">Thứ Ba, 18 Tháng 11, 2025</div>
+        <div id="clock-time">--:--</div>
+        <div id="clock-date">...</div>
     </header>
 
     <main class="main-content">
         <div class="session-info">
-            <h2></h2>
-            <h1 id="session-title"></h1>
-            <p id="session-details"></p>
-
+            <h2>Phiên Tiếp Theo</h2>
+            <h1 id="session-title">Đang tải...</h1>
+            <p id="session-details">...</p>
         </div>
     </main>
 
@@ -169,11 +116,8 @@
     </footer>
 
     <script>
-
-        // const WS_URL = "wss://doantonghopiot.namanhishere.com/ws";
         const WS_URL = "ws://localhost:1836/ws";
         const ROOM_ID = "101";
-
 
         document.addEventListener("DOMContentLoaded", () => {
             const clockTime = document.getElementById("clock-time");
@@ -183,96 +127,126 @@
             const sessionLabel = document.querySelector(".session-info h2");
             const statusBar = document.getElementById("status-bar");
 
+            // Popup Elements
+            const popupOverlay = document.getElementById("popup-overlay");
+            const popupCard = document.getElementById("popup-card");
+            const popupIcon = document.getElementById("popup-icon");
+            const popupTitle = document.getElementById("popup-title");
+            const popupMsg = document.getElementById("popup-message");
+            let popupTimeout;
+
+            // --- CHECK FOR REDIRECT PARAMS (New Logic) ---
+            checkRedirectParams();
+
+            function checkRedirectParams() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const status = urlParams.get('status');
+                const name = urlParams.get('name');
+
+                if (status) {
+                    if (status === 'authorized') {
+                        showPopup("success", "Xin chào!", `Checkin thành công`);
+                    } else {
+                        showPopup("error", "Từ chối", "Mã QR không hợp lệ");
+                    }
+                    
+                    // Clean the URL so refreshing doesn't show popup again
+                    window.history.replaceState({}, document.title, "/");
+                }
+            }
+            // ---------------------------------------------
 
             function updateClock() {
                 const now = new Date();
-                const time = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                const date = now.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
-                clockTime.textContent = time;
-                clockDate.textContent = date;
+                clockTime.textContent = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                clockDate.textContent = now.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
             }
             setInterval(updateClock, 1000);
             updateClock();
-
 
             function connect() {
                 const ws = new WebSocket(WS_URL);
 
                 ws.onopen = () => {
-                    console.log("Đã kết nối tới WebSocket server.");
+                    console.log("WS Connected");
                     showStatus("Đã kết nối!", "success");
-
-
-                    ws.send(JSON.stringify({
-                        type: "identification",
-                        role: "kiosk",
-                        room: ROOM_ID
-                    }));
-
-
-                    ws.send(JSON.stringify({
-                        type: "get_session_info",
-                        room: ROOM_ID
-                    }));
+                    ws.send(JSON.stringify({ type: "identification", role: "kiosk", room: ROOM_ID }));
+                    ws.send(JSON.stringify({ type: "get_session_info", room: ROOM_ID }));
                 };
 
                 ws.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
-                        console.log("Nhận được data:", data);
-
-
+                        
                         if (data.type === "session_update") {
                             updateSessionInfo(data.payload);
                         }
 
+                        if (data.type === "access_log") {
+                            if (data.status === "AUTHORIZED") {
+                                const name = data.name || "Khách";
+                                showPopup("success", "Xin chào!", `Mời vào, ${name}`);
+                            } else {
+                                showPopup("error", "Từ chối", "Thẻ/QR không hợp lệ hoặc hết hạn.");
+                            }
+                        }
 
-                        if (data.type === "checkin_success") {
-                            showStatus(`Chào mừng, ${data.userName}!`, "success");
+                        if (data.type === "door_status") {
+                            if (data.action === "OPEN") {
+                                showPopup("success", "Cửa Mở", `Mở bởi: ${data.source}`);
+                            } else {
+                                showPopup("info", "Cửa Đóng", `Đóng bởi: ${data.source}`);
+                            }
                         }
 
                     } catch (e) {
-                        console.error("Lỗi parse JSON:", e);
+                        console.error("JSON Error:", e);
                     }
                 };
 
                 ws.onclose = () => {
-                    console.log("Đã mất kết nối. Thử kết nối lại sau 5 giây.");
                     showStatus("Mất kết nối. Đang thử lại...", "error");
                     setTimeout(connect, 5000);
                 };
-
-                ws.onerror = (err) => {
-                    console.error("Lỗi WebSocket:", err);
-                    showStatus("Lỗi kết nối WebSocket.", "error");
-                    ws.close();
-                };
             }
 
-
             function updateSessionInfo(session) {
-                if (session && session.title) {
-                    sessionTitle.textContent = session.title;
-                    sessionDetails.textContent = `Người đặt: ${session.organizer}`;
-                    sessionLabel.textContent = `Phiên Tiếp Theo (${session.startTime})`;
+                if (session) {
+                    sessionTitle.textContent = session.title || "Phiên họp";
+                    sessionDetails.textContent = `${session.startTime} - ${session.endTime}`;
+                    sessionLabel.textContent = "Phiên Sắp Tới";
                 } else {
-                    sessionTitle.textContent = "Không có phiên nào sắp diễn ra";
-                    sessionDetails.textContent = "Phòng đang trống";
-                    sessionLabel.textContent = "Hiện tại";
+                    sessionTitle.textContent = "Không có lịch";
+                    sessionDetails.textContent = "Phòng trống";
+                    sessionLabel.textContent = "Trạng thái";
                 }
             }
 
-            function showStatus(message, type = "error") {
+            function showStatus(message, type) {
                 statusBar.textContent = message;
                 statusBar.className = type;
             }
 
+            function showPopup(type, title, message) {
+                popupCard.className = "popup-card " + type;
+                popupTitle.textContent = title;
+                popupMsg.textContent = message;
 
+                if (type === 'success') popupIcon.textContent = "✔";
+                else if (type === 'error') popupIcon.textContent = "✖";
+                else popupIcon.textContent = "ℹ";
+
+                popupOverlay.classList.add("active");
+
+                clearTimeout(popupTimeout);
+                popupTimeout = setTimeout(() => {
+                    popupOverlay.classList.remove("active");
+                }, 3000);
+            }
+
+            setInterval(() => {}, 60000);
             connect();
-            updateSessionInfo();
         });
     </script>
 </body>
-
 </html>
