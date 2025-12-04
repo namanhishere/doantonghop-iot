@@ -27,6 +27,10 @@ import path from "path";
 import mysql from "mysql2/promise";
 import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid";
+import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = process.cwd();
@@ -40,6 +44,7 @@ app.use(express.urlencoded({ extended: true }));
 app.set("views", path.resolve("views"));
 app.set("view engine", "ejs");
 app.use(express.static(path.resolve("public")));
+app.use(cookieParser());
 
 const db = await mysql.createConnection({
     host: "localhost",
@@ -237,7 +242,62 @@ wss.on("connection", (ws: IOTClient) => {
 });
 
 
-app.get("/api/rooms", async (req, res) => {
+//mid for auth
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "coconut";
+const COOKIEAUTH_VALUE = process.env.COOKIEAUTH || "cocomelon";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "adminpass";
+const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const apiKey = req.headers["x-private-key"] || req.query.key;
+    const authCookie = req.cookies?.access_key;
+
+    if (apiKey === PRIVATE_KEY) {
+        req.source = "EXTERNAL";
+        return next();
+    } 
+    
+    if (authCookie === COOKIEAUTH_VALUE) {
+        req.source = "CONSOLE";
+        return next();
+    }
+
+    console.log(`Blocked unauthorized request from ${req.ip} to ${req.originalUrl}`);
+    return res.status(403).json({ error: "Forbidden: Authentication required" });
+    
+};
+
+// Login Page UI
+app.get("/login", (req, res) => {
+    const authCookie = req.cookies?.access_key;
+    if (authCookie === COOKIEAUTH_VALUE) {
+        return res.redirect("/");
+    }
+    res.render("login"); // Make sure you have a login.ejs view
+});
+
+// Process Login
+app.post("/login", (req, res) => {
+    const { password } = req.body;
+    if (password === ADMIN_PASSWORD) {
+        res.cookie("access_key", COOKIEAUTH_VALUE, { 
+            httpOnly: true, 
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+        return res.redirect("/");
+    }
+    
+    return res.status(401).json({ error: "Invalid Password" });
+});
+
+app.get("/logout", (req, res) => {
+    res.clearCookie("access_key");
+    res.redirect("/login");
+});
+
+app.get("/", requireAuth, (req, res) => { 
+    res.render("index");
+});
+
+app.get("/api/rooms", requireAuth , async (req, res) => {
     try {
         const [rows] = await db.execute("SELECT * FROM room");
         res.json(rows);
@@ -246,7 +306,7 @@ app.get("/api/rooms", async (req, res) => {
     }
 });
 
-app.post("/api/rooms", async (req, res) => {
+app.post("/api/rooms", requireAuth , async (req, res) => {
     const { id, roomname } = req.body;
     if (!id || !roomname) return res.status(400).send("Missing id or roomname");
     try {
@@ -257,7 +317,7 @@ app.post("/api/rooms", async (req, res) => {
     }
 });
 
-app.delete("/api/rooms/:id", async (req, res) => {
+app.delete("/api/rooms/:id", requireAuth , async (req, res) => {
     
     try {
         await db.execute("DELETE FROM room WHERE id = ?", [req.params.id]);
@@ -266,7 +326,7 @@ app.delete("/api/rooms/:id", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-app.get("/api/cards", async (req, res) => {
+app.get("/api/cards", requireAuth , async (req, res) => {
     try {
         const query = `
             SELECT c.uid, c.cardname, GROUP_CONCAT(a.room_id) as access_rooms
@@ -281,7 +341,7 @@ app.get("/api/cards", async (req, res) => {
     }
 });
 
-app.post("/api/cards", async (req, res) => {
+app.post("/api/cards", requireAuth , async (req, res) => {
     const { uid, cardname } = req.body;
     if (!uid || !cardname) return res.status(400).send("Missing uid or cardname");
     try {
@@ -293,7 +353,7 @@ app.post("/api/cards", async (req, res) => {
 });
 
 
-app.post("/api/cards/access", async (req, res) => {
+app.post("/api/cards/access", requireAuth , async (req, res) => {
     const { uid, room_id } = req.body;
     try {
         await db.execute("INSERT INTO rfid_access (card_uid, room_id) VALUES (?, ?)", [uid, room_id]);
@@ -304,7 +364,19 @@ app.post("/api/cards/access", async (req, res) => {
 });
 
 
-app.delete("/api/cards/access", async (req, res) => {
+app.delete("/api/cards/:uid", requireAuth , async (req, res) => {
+    try {
+        await db.execute("UPDATE opencloselog SET card_uid = NULL WHERE card_uid = ?", [req.params.uid]);
+        await db.execute("DELETE FROM rfid_access WHERE card_uid = ?", [req.params.uid]);
+        await db.execute("DELETE FROM rfid_card WHERE uid = ?", [req.params.uid]);
+        
+        res.send("Card deleted");
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete("/api/cards/access", requireAuth , async (req, res) => {
     const { uid, room_id } = req.body;
     try {
         await db.execute("DELETE FROM rfid_access WHERE card_uid = ? AND room_id = ?", [uid, room_id]);
@@ -315,7 +387,7 @@ app.delete("/api/cards/access", async (req, res) => {
 });
 
 
-app.get("/api/sessions", async (req, res) => {
+app.get("/api/sessions", requireAuth , async (req, res) => {
     try {
         const [rows] = await db.execute("SELECT * FROM qr_session ORDER BY starttime DESC");
         res.json(rows);
@@ -324,7 +396,7 @@ app.get("/api/sessions", async (req, res) => {
     }
 });
 
-app.post("/api/sessions", async (req, res) => {
+app.post("/api/sessions", requireAuth , async (req, res) => {
     const { room_id, duration_minutes, startTime } = req.body;
     if (!room_id || !duration_minutes) return res.status(400).send("Missing room_id or duration");
 
@@ -349,11 +421,13 @@ app.post("/api/sessions", async (req, res) => {
 
 
 
-app.get("/open-door", async (req: express.Request, res: express.Response) => {
-    let { room, source } = req.query;
-    if (!room) return res.status(400).send("Missing room");
+app.get("/open-door", requireAuth , async (req: express.Request, res: express.Response) => {
+    let { room } = req.query;
+    if (!room) return res.status(400).send({
+        error: "Missing room"
+    });
     room = String(room).trim();
-    const trigger = String(source || "CONSOLE").toUpperCase();
+    const trigger = req.source || "CONSOLE";
 
     try {
         const ws = ESPClients.get(room);
@@ -380,7 +454,7 @@ app.get("/open-door", async (req: express.Request, res: express.Response) => {
     }
 });
 
-// app.get("/close-door", async (req: express.Request, res: express.Response) => {
+// app.get("/close-door", requireAuth , async (req: express.Request, res: express.Response) => {
 //     let { room, source } = req.query;
 //     if (!room) return res.status(400).send("Missing room");
 //     room = String(room).trim();

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f6f9;
+        }
+        .login-card {
+            max-width: 400px;
+            width: 100%;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main Container: Centered Vertically and Horizontally -->
+    <div class="d-flex justify-content-center align-items-center vh-100 p-3">
+        
+        <div class="card login-card p-4">
+            <div class="card-body">
+                <h3 class="text-center mb-4">Admin Login</h3>
+                
+                <!-- Error Alert (Hidden by default) -->
+                <div id="error-alert" class="alert alert-danger d-none" role="alert">
+                    <!-- Error message will appear here -->
+                </div>
+
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter admin password" required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Sign In</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom Script to handle your specific Backend Logic -->
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault(); // Stop the page from reloading immediately
+
+            const password = document.getElementById('password').value;
+            const errorAlert = document.getElementById('error-alert');
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ password: password })
+                });
+
+                // If the redirect was successful (Fetch follows redirects automatically)
+                if (response.redirected) {
+                    window.location.href = response.url;
+                    return;
+                }
+
+                // If backend returns a 200 OK after redirect logic
+                if (response.ok) {
+                    // Usually implies success if the URL changed to root
+                    window.location.href = "/";
+                    return;
+                }
+
+                // Handle Errors (401, etc)
+                const data = await response.json();
+                
+                // Show the error message from the backend
+                errorAlert.textContent = data.error || "An error occurred";
+                errorAlert.classList.remove('d-none');
+
+            } catch (err) {
+                console.error(err);
+                errorAlert.textContent = "Server connection failed.";
+                errorAlert.classList.remove('d-none');
+            }
+        });
+    </script>
+</body>
+</html>
