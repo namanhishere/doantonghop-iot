@@ -64,6 +64,7 @@ interface IOTClient extends WebSocket {
 const ESPClients: Map<string, IOTClient> = new Map();
 const KioskClients: Map<string, IOTClient> = new Map();
 
+
 // Helper to send data to the Kiosk UI
 const broadcastToKiosk = (roomId: string, data: any) => {
     const kiosk = KioskClients.get(roomId);
@@ -379,36 +380,36 @@ app.get("/open-door", async (req: express.Request, res: express.Response) => {
     }
 });
 
-app.get("/close-door", async (req: express.Request, res: express.Response) => {
-    let { room, source } = req.query;
-    if (!room) return res.status(400).send("Missing room");
-    room = String(room).trim();
-    const trigger = String(source || "CONSOLE").toUpperCase();
+// app.get("/close-door", async (req: express.Request, res: express.Response) => {
+//     let { room, source } = req.query;
+//     if (!room) return res.status(400).send("Missing room");
+//     room = String(room).trim();
+//     const trigger = String(source || "CONSOLE").toUpperCase();
 
-    try {
-        const ws = ESPClients.get(room);
-        if (ws) {
-            ws.send("CLOSE_DOOR");
-            await db.execute(
-                `INSERT INTO opencloselog (room_id, action, web_trigger) VALUES (?, 'CLOSE', ?)`,
-                [room, trigger]
-            );
+//     try {
+//         const ws = ESPClients.get(room);
+//         if (ws) {
+//             ws.send("CLOSE_DOOR");
+//             await db.execute(
+//                 `INSERT INTO opencloselog (room_id, action, web_trigger) VALUES (?, 'CLOSE', ?)`,
+//                 [room, trigger]
+//             );
 
-            // Notify Kiosk
-            broadcastToKiosk(room, {
-                type: "door_status",
-                action: "CLOSE",
-                source: trigger
-            });
+//             // Notify Kiosk
+//             broadcastToKiosk(room, {
+//                 type: "door_status",
+//                 action: "CLOSE",
+//                 source: trigger
+//             });
 
-            res.send(`Door closed for room ${room}`);
-        } else {
-            res.status(404).send(`ESP not connected for room ${room}`);
-        }
-    } catch (err) {
-        res.status(500).send("Error");
-    }
-});
+//             res.send(`Door closed for room ${room}`);
+//         } else {
+//             res.status(404).send(`ESP not connected for room ${room}`);
+//         }
+//     } catch (err) {
+//         res.status(500).send("Error");
+//     }
+// });
 
 app.get("/", (req, res) => {
     res.render("index");

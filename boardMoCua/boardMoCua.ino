@@ -60,11 +60,6 @@ void setup() {
 
 void loop() {
   if (client.available()) client.poll();
-  
-  if (millis() - lastPing > PING_INTERVAL) {
-    client.ping();
-    lastPing = millis();
-  }
 
   
   if (relayOffTime > 0 && millis() >= relayOffTime) {
@@ -119,7 +114,8 @@ void onMessageCallback(WebsocketsMessage msg) {
   if (data.indexOf("\"AUTHORIZED\"") != -1) {
     Serial.println("Access granted");
     digitalWrite(RELAY_PIN, HIGH);
-    relayOffTime = millis() + AUTO_CLOSE_DELAY; 
+    delay(1000);
+    digitalWrite(RELAY_PIN, LOW);
   }
   else if (data.indexOf("\"DENIED\"") != -1) {
     Serial.println("Access denied");
@@ -128,7 +124,9 @@ void onMessageCallback(WebsocketsMessage msg) {
   else if (data == "OPEN_DOOR") {
     Serial.println("Remote OPEN_DOOR command received");
     digitalWrite(RELAY_PIN, HIGH);
-    relayOffTime = millis() + AUTO_CLOSE_DELAY; 
+    // relayOffTime = millis() + AUTO_CLOSE_DELAY;
+    delay(1000);
+    digitalWrite(RELAY_PIN, LOW);
   }
   // else if (data == "CLOSE_DOOR") {
   //   Serial.println("Remote CLOSE_DOOR command received");

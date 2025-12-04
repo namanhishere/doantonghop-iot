@@ -5,3 +5,4 @@ dist
 .vscode
 __pycache__
 */venv
+static_checker.py

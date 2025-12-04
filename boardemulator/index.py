@@ -53,7 +53,8 @@ class EspSimulator:
         self.ws.run_forever(ping_interval=15)
 
 if __name__ == "__main__":
-    URL = "ws://localhost:1836/ws"
+    # URL = "ws://localhost:1836/ws"
+    URL = "wss://doantonghopiot.namanhishere.com/ws"
     ROOM = "101"
 
     sim = EspSimulator(URL, ROOM)
