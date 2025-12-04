@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=BoardCam Kiosk
+Comment=Start Flask and Firefox Kiosk
+Exec=/bin/bash /home/namanhishere/doantonghop-iot/boardCam/run.sh
+Terminal=true
