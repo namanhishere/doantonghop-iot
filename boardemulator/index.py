@@ -55,7 +55,7 @@ class EspSimulator:
 if __name__ == "__main__":
     # URL = "ws://localhost:1836/ws"
     URL = "wss://doantonghopiot.namanhishere.com/ws"
-    ROOM = "101"
+    ROOM = "1"
 
     sim = EspSimulator(URL, ROOM)
     

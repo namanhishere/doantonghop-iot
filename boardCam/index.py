@@ -10,7 +10,7 @@ import queue
 
 
 REMOTE_WS_URL = "wss://doantonghopiot.namanhishere.com/ws"
-ROOM_ID = "101" 
+ROOM_ID = "1" 
 FLASK_PORT = 5000 
 
 

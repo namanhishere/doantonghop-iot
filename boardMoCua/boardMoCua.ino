@@ -9,7 +9,7 @@ using namespace websockets;
 const char* WIFI_SSID = "P601";
 const char* WIFI_PASS = "phong601@"; //neu ban la nguoi tot, xin dung coi lai commit cu de thay pass wifi nha toi. cam on ban
 const char* WS_URL = "wss://doantonghopiot.namanhishere.com/ws";
-const char* ROOM_ID = "101"; 
+const char* ROOM_ID = "1"; 
 
 #define SS_PIN    4   
 #define RST_PIN   5   
